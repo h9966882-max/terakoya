@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>思考の五十講 — カリキュラム・アーカイブ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;500;600;700&family=Zen+Kaku+Gothic+New:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="eyebrow">Thinking Curriculum Archive</div>
+    <h1>思考の五十講</h1>
+    <div class="sub">哲学・意味論・認知科学、それぞれ50週。各週は「①定義 ②構造 ③意思決定ルール ④観測ポイント ⑤介入 ⑥失敗パターン」の6要素で構造化されている。約18ヶ月かけて編まれる、思考の基盤。</div>
+    <div class="stat-row" id="statRow"></div>
+  </header>
+
+  <div class="subject-grid" id="subjectGrid"></div>
+
+  <footer>KURICULUM.JSON — 光沙 / 哲学50講義シリーズ</footer>
+</div>
+
+<script src="js/data/philosophy.js"></script>
+<script src="js/data/semantics.js"></script>
+<script src="js/data/cogsci.js"></script>
+<script src="js/data/notes.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/render.js"></script>
+<script>
+  const upcoming = [
+    {key:"strategy", name:"戦略思考", note:"50講義"},
+    {key:"tbd1", name:"未定 ①", note:"50講義"},
+    {key:"tbd2", name:"未定 ②", note:"50講義"},
+    {key:"short1", name:"未定 ③", note:"30講義"},
+    {key:"short2", name:"未定 ④", note:"30講義"},
+  ];
+  initIndexPage([philosophy, semantics, cogsci], upcoming);
+</script>
+</body>
+</html>
