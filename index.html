@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>思考の五十講 — 書庫</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,500&family=Shippori+Mincho:wght@500;600;700&family=Zen+Kaku+Gothic+New:wght@300;400;500;700&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="eyebrow">A Private Library of Thought</div>
+    <h1>思考の五十講</h1>
+    <div class="h1-rule"></div>
+    <div class="sub">哲学・意味論・認知科学・行動科学・ゲーム理論・戦略思考 ── 六冊の書、三百週の思考。</div>
+    <div class="stat-row" id="statRow"></div>
+  </header>
+
+  <div class="shelf-wrap">
+    <div class="shelf-label">— 蔵書 —</div>
+    <div class="shelf" id="shelf"></div>
+  </div>
+
+  <footer>Ex Libris — 光沙 の書庫</footer>
+</div>
+
+<script src="js/data/philosophy.js"></script>
+<script src="js/data/semantics.js"></script>
+<script src="js/data/cogsci.js"></script>
+<script src="js/data/behavior.js"></script>
+<script src="js/data/game.js"></script>
+<script src="js/data/strategy.js"></script>
+<script src="js/data/notes.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/render.js"></script>
+<script>
+  const upcoming = [
+    {key:"new50-1", name:"新50講 ①", note:"50講義"},
+    {key:"new50-2", name:"新50講 ②", note:"50講義"},
+    {key:"short1", name:"30講 ①", note:"30講義"},
+    {key:"short2", name:"30講 ②", note:"30講義"},
+    {key:"short3", name:"30講 ③", note:"30講義"},
+    {key:"short4", name:"30講 ④", note:"30講義"},
+    {key:"short5", name:"30講 ⑤", note:"30講義"},
+  ];
+  initIndexPage([philosophy, semantics, cogsci, behavior, game, strategy], upcoming);
+</script>
+</body>
+</html>
