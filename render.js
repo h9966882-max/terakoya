@@ -1,63 +1,70 @@
-/* ===== 共通レンダリングエンジン ===== */
+/* ===== 共通レンダリングエンジン（Victorian書斎版） ===== */
 
 let doneMap = {};
-let openCards = {};
+let openWeek = null; // 現在展開中の週番号（1つだけ）
 let currentView = "list";
 let currentPhaseFilter = "all";
+
+/* 科目キーの請求記号プレフィックス（3〜4文字） */
+const CALLNO_PREFIX = {
+  philosophy:"PHIL", semantics:"SEM", cogsci:"COG", behavior:"BEHV", game:"GAME", strategy:"STRT"
+};
 
 function subjectTotal(s){ return s.phases.reduce((a,p)=>a+p.weeks.length,0); }
 function subjectDone(s){ return s.phases.reduce((a,p)=>a+p.weeks.filter(w=>doneMap[s.key+':'+w[0]]).length,0); }
 
-/* Obsidian風の軽量記法をHTMLに変換（テキストのみ、リンクは今回未対応） */
 function formatNoteText(text){
   if(!text) return "";
-  let html = text
+  return text
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
     .replace(/==(.+?)==/g, '<mark>$1</mark>')
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.+?)\*/g, '<em>$1</em>');
-  return html;
 }
 
-function renderCard(subj, w){
+function renderExpandPanel(subj, w){
   const [n,title,def,struct,rule,obs,intervene,fail] = w;
   const id = subj.key+':'+n;
-  const isDone = !!doneMap[id];
-  const isOpen = !!openCards[id];
   const noteText = (NOTES[subj.key] && NOTES[subj.key][n]) ? NOTES[subj.key][n] : null;
-  return `
-  <div class="card ${isOpen?'open':''}" data-id="${id}">
-    <div class="card-head" data-toggle="${id}">
-      <div class="wknum">W${String(n).padStart(2,'0')}</div>
-      <div class="wktitle">${title}</div>
-      <div class="chev">▶</div>
-      <div class="check ${isDone?'done':''}" data-check="${id}">${isDone?'✓':''}</div>
-    </div>
-    <div class="card-body">
-      <div class="field"><div class="fl">① 定義</div><div class="fv">${def}</div></div>
-      <div class="field"><div class="fl">② 構造</div><div class="fv">${struct.join(' ／ ')}</div></div>
-      <div class="field rule"><div class="fl">③ 意思決定ルール</div><div class="fv">${rule}</div></div>
-      <div class="field obs"><div class="fl">④ 観測ポイント</div><div class="fv">${obs}</div></div>
-      <div class="field"><div class="fl">⑤ 介入</div><div class="fv">${intervene}</div></div>
-      <div class="field fail"><div class="fl">⑥ 失敗パターン</div><div class="fv">${fail}</div></div>
-      <div class="note-section">
-        ${noteText
-          ? `<div class="note-toggle" data-note="${id}">▶ 講義ノートを見る</div><div class="note-body" id="note-${id.replace(':','-')}">${formatNoteText(noteText)}</div>`
-          : `<div class="note-empty">講義ノート未登録</div>`}
-      </div>
+  const prefix = CALLNO_PREFIX[subj.key] || subj.key.toUpperCase();
+  return `<div class="expand-panel">
+    <span class="callno">${prefix} · W${String(n).padStart(2,'0')}</span>
+    <h3>${title}</h3>
+    <div class="e-field"><div class="e-fl">① 定義</div><div class="e-fv">${def}</div></div>
+    <div class="e-field"><div class="e-fl">② 構造</div><div class="e-fv">${struct.join(' ／ ')}</div></div>
+    <div class="e-field"><div class="e-fl">③ 意思決定ルール</div><div class="e-fv">${rule}</div></div>
+    <div class="e-field"><div class="e-fl">④ 観測ポイント</div><div class="e-fv">${obs}</div></div>
+    <div class="e-field"><div class="e-fl">⑤ 介入</div><div class="e-fv">${intervene}</div></div>
+    <div class="e-field"><div class="e-fl">⑥ 失敗パターン</div><div class="e-fv">${fail}</div></div>
+    <div class="note-section">
+      ${noteText
+        ? `<div class="note-toggle" data-note="${id}">❧ 講義ノートを見る</div><div class="note-body" id="note-${id.replace(':','-')}">${formatNoteText(noteText)}</div>`
+        : `<div class="note-empty">講義ノート未登録</div>`}
     </div>
   </div>`;
 }
 
-function bindCardEvents(onChange){
-  document.querySelectorAll('[data-toggle]').forEach(el=>{
+function renderCatalogCard(subj, w){
+  const [n,title] = w;
+  const id = subj.key+':'+n;
+  const isDone = !!doneMap[id];
+  const prefix = CALLNO_PREFIX[subj.key] || subj.key.toUpperCase();
+  return `<div class="catalog-card ${isDone?'done':''}" data-open="${id}">
+    <div class="check ${isDone?'done':''}" data-check="${id}">${isDone?'✓':''}</div>
+    <div class="callno">${prefix} · W${String(n).padStart(2,'0')}</div>
+    <div class="catalog-title">${title}</div>
+  </div>`;
+}
+
+function bindGridEvents(container, onChange){
+  container.querySelectorAll('[data-open]').forEach(el=>{
     el.addEventListener('click', ()=>{
-      const id = el.dataset.toggle;
-      openCards[id] = !openCards[id];
+      const id = el.dataset.open;
+      openWeek = (openWeek === id) ? null : id;
       onChange();
     });
   });
-  document.querySelectorAll('[data-check]').forEach(el=>{
+  container.querySelectorAll('[data-check]').forEach(el=>{
     el.addEventListener('click', (e)=>{
       e.stopPropagation();
       const id = el.dataset.check;
@@ -66,14 +73,14 @@ function bindCardEvents(onChange){
       onChange();
     });
   });
-  document.querySelectorAll('[data-note]').forEach(el=>{
+  container.querySelectorAll('[data-note]').forEach(el=>{
     el.addEventListener('click', (e)=>{
       e.stopPropagation();
       const id = el.dataset.note;
       const body = document.getElementById('note-'+id.replace(':','-'));
       if(body){
         body.classList.toggle('open');
-        el.textContent = (body.classList.contains('open') ? '▼' : '▶') + ' 講義ノートを見る';
+        el.innerHTML = (body.classList.contains('open') ? '❧ 閉じる' : '❧ 講義ノートを見る');
       }
     });
   });
@@ -95,7 +102,7 @@ function renderProgressBar(container, subj){
   const total = subjectTotal(subj);
   const done = subjectDone(subj);
   container.innerHTML = `
-    <div class="progress-track"><div class="progress-fill" style="width:${total?done/total*100:0}%; background:${subj.color}"></div></div>
+    <div class="progress-track"><div class="progress-fill" style="width:${total?done/total*100:0}%"></div></div>
     <div class="progress-label">${subj.name} — ${done} / ${total} 週 完了</div>
   `;
 }
@@ -104,9 +111,14 @@ function renderListView(container, subj){
   let html = '';
   subj.phases.forEach((p, idx)=>{
     if(currentPhaseFilter !== 'all' && currentPhaseFilter !== idx) return;
+    const cards = p.weeks.map(w=>{
+      const id = subj.key+':'+w[0];
+      const card = renderCatalogCard(subj, w);
+      return (openWeek === id) ? card + renderExpandPanel(subj, w) : card;
+    }).join('');
     html += `<div class="phase-block">
       <div class="phase-title">${p.title} <span class="range">W${String(p.weeks[0][0]).padStart(2,'0')}–W${String(p.weeks[p.weeks.length-1][0]).padStart(2,'0')}</span></div>
-      ${p.weeks.map(w=>renderCard(subj,w)).join('')}
+      <div class="card-grid">${cards}</div>
     </div>`;
   });
   container.innerHTML = html;
@@ -123,14 +135,14 @@ function renderTimelineView(container, subj, onJumpToList){
       html += `<div class="tl-row">
         <div class="tl-dot ${isDone?'done':''}" data-check="${id}"></div>
         <div class="tl-week">W${String(w[0]).padStart(2,'0')}</div>
-        <div class="tl-title" data-toggle="${id}">${w[1]}</div>
+        <div class="tl-title" data-open="${id}">${w[1]}</div>
       </div>`;
     });
   });
   html += '</div></div>';
   container.innerHTML = html;
-  container.querySelectorAll('[data-toggle]').forEach(el=>{
-    el.addEventListener('click', ()=>{ onJumpToList(el.dataset.toggle); });
+  container.querySelectorAll('[data-open]').forEach(el=>{
+    el.addEventListener('click', ()=>{ onJumpToList(el.dataset.open); });
   });
   container.querySelectorAll('[data-check]').forEach(el=>{
     el.addEventListener('click', (e)=>{
@@ -158,12 +170,12 @@ async function initSubjectPage(subj){
     renderProgressBar(progressEl, subj);
     if(currentView === 'list'){
       renderListView(content, subj);
-      bindCardEvents(fullRender);
+      bindGridEvents(content, fullRender);
     }else{
       renderTimelineView(content, subj, (id)=>{
         currentView = 'list';
         btnList.classList.add('active'); btnTimeline.classList.remove('active');
-        openCards[id] = true;
+        openWeek = id;
         fullRender();
       });
     }
@@ -179,33 +191,36 @@ async function initSubjectPage(subj){
   fullRender();
 }
 
-/* ===== トップページの初期化 ===== */
+/* ===== トップページ（本棚）の初期化 ===== */
 async function initIndexPage(allSubjects, upcoming){
   doneMap = await loadProgress();
   const totalAll = allSubjects.reduce((a,s)=>a+subjectTotal(s),0);
   const doneAll = allSubjects.reduce((a,s)=>a+subjectDone(s),0);
 
   document.getElementById('statRow').innerHTML = `
-    <div class="stat"><div class="n">${allSubjects.length}<span style="font-size:13px;">/${allSubjects.length+upcoming.length}</span></div><div class="l">科目 実装済</div></div>
-    <div class="stat"><div class="n">${totalAll}</div><div class="l">総講義数</div></div>
-    <div class="stat"><div class="n">${doneAll}</div><div class="l">完了</div></div>
-    <div class="stat"><div class="n">${totalAll?Math.round(doneAll/totalAll*100):0}%</div><div class="l">全体進捗</div></div>
+    <div class="stat"><div class="n">${allSubjects.length}</div><div class="l">Volumes</div></div>
+    <div class="stat"><div class="n">${totalAll}</div><div class="l">Weeks</div></div>
+    <div class="stat"><div class="n">${doneAll}</div><div class="l">Completed</div></div>
+    <div class="stat"><div class="n">${totalAll?Math.round(doneAll/totalAll*100):0}%</div><div class="l">Progress</div></div>
   `;
 
-  const grid = document.getElementById('subjectGrid');
+  const shelf = document.getElementById('shelf');
   let html = allSubjects.map(s=>{
-    const total = subjectTotal(s), done = subjectDone(s);
-    return `<a class="subj-card" href="${s.key}.html">
-      <div class="bar" style="background:${s.color}"></div>
-      <div class="name">${s.name}</div>
-      <div class="meta">${total}週 ／ ${done}完了</div>
-      <div class="prog-track"><div class="prog-fill" style="width:${total?done/total*100:0}%; background:${s.color}"></div></div>
+    const t = subjectTotal(s), d = subjectDone(s);
+    const inProgress = d > 0 && d < t;
+    const completed = t > 0 && d === t;
+    return `<a class="spine" href="${s.key}.html" style="background:linear-gradient(180deg, ${s.color}dd, ${s.color}aa 60%, ${s.color}88)">
+      ${inProgress ? '<div class="ribbon"></div>' : ''}
+      ${completed ? '<div class="stamp">読了</div>' : ''}
+      <div class="cap"></div>
+      <div class="title">${s.name}</div>
+      <div class="plate">${d}/${t}</div>
     </a>`;
   }).join('');
-  html += upcoming.map(u=>`<div class="subj-card disabled">
-      <div class="bar" style="background:var(--rule)"></div>
-      <div class="name">${u.name}</div>
-      <div class="meta">${u.note}・準備中</div>
+  html += upcoming.map(u=>`<div class="spine disabled" style="background:linear-gradient(180deg,#3a3a3add,#2a2a2aaa)">
+      <div class="cap"></div>
+      <div class="title">${u.name}</div>
+      <div class="plate">準備中</div>
     </div>`).join('');
-  grid.innerHTML = html;
+  shelf.innerHTML = html;
 }
