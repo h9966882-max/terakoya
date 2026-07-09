@@ -22,10 +22,29 @@ function formatNoteText(text){
     .replace(/\*(.+?)\*/g, '<em>$1</em>');
 }
 
+/* 講義ノートは notes/科目キー/週番号(2桁).txt を都度fetchして読み込む。
+   ファイルが無ければ「未登録」と表示するだけなので、
+   ノートを増やすときはこのファイル(render.js)を一切編集しなくてよい。 */
+const noteCache = {};
+async function fetchNoteText(subjKey, weekNum){
+  const cacheKey = subjKey+':'+weekNum;
+  if(noteCache[cacheKey] !== undefined) return noteCache[cacheKey];
+  const path = `notes/${subjKey}/${String(weekNum).padStart(2,'0')}.txt`;
+  try{
+    const res = await fetch(path);
+    if(!res.ok){ noteCache[cacheKey] = null; return null; }
+    const text = await res.text();
+    noteCache[cacheKey] = text;
+    return text;
+  }catch(e){
+    noteCache[cacheKey] = null;
+    return null;
+  }
+}
+
 function renderExpandPanel(subj, w){
   const [n,title,def,struct,rule,obs,intervene,fail] = w;
   const id = subj.key+':'+n;
-  const noteText = (NOTES[subj.key] && NOTES[subj.key][n]) ? NOTES[subj.key][n] : null;
   const prefix = CALLNO_PREFIX[subj.key] || subj.key.toUpperCase();
   return `<div class="expand-panel">
     <span class="callno">${prefix} · W${String(n).padStart(2,'0')}</span>
@@ -37,9 +56,8 @@ function renderExpandPanel(subj, w){
     <div class="e-field"><div class="e-fl">⑤ 介入</div><div class="e-fv">${intervene}</div></div>
     <div class="e-field"><div class="e-fl">⑥ 失敗パターン</div><div class="e-fv">${fail}</div></div>
     <div class="note-section">
-      ${noteText
-        ? `<div class="note-toggle" data-note="${id}">❧ 講義ノートを見る</div><div class="note-body" id="note-${id.replace(':','-')}">${formatNoteText(noteText)}</div>`
-        : `<div class="note-empty">講義ノート未登録</div>`}
+      <div class="note-toggle" data-note="${id}" data-week="${n}" data-subj="${subj.key}">❧ 講義ノートを見る</div>
+      <div class="note-body" id="note-${id.replace(':','-')}"></div>
     </div>
   </div>`;
 }
@@ -74,14 +92,25 @@ function bindGridEvents(container, onChange){
     });
   });
   container.querySelectorAll('[data-note]').forEach(el=>{
-    el.addEventListener('click', (e)=>{
+    el.addEventListener('click', async (e)=>{
       e.stopPropagation();
       const id = el.dataset.note;
       const body = document.getElementById('note-'+id.replace(':','-'));
-      if(body){
-        body.classList.toggle('open');
-        el.innerHTML = (body.classList.contains('open') ? '❧ 閉じる' : '❧ 講義ノートを見る');
+      if(!body) return;
+      const isOpen = body.classList.contains('open');
+      if(isOpen){
+        body.classList.remove('open');
+        el.innerHTML = '❧ 講義ノートを見る';
+        return;
       }
+      if(body.dataset.loaded !== 'true'){
+        el.innerHTML = '❧ 読み込み中…';
+        const text = await fetchNoteText(el.dataset.subj, Number(el.dataset.week));
+        body.innerHTML = text ? formatNoteText(text) : '<span style="opacity:.6">講義ノート未登録</span>';
+        body.dataset.loaded = 'true';
+      }
+      body.classList.add('open');
+      el.innerHTML = '❧ 閉じる';
     });
   });
 }
