@@ -253,3 +253,4 @@ async function initIndexPage(allSubjects, upcoming){
     </div>`).join('');
   shelf.innerHTML = html;
 }
+ 
