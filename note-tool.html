@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>講義ノート ファイル化ツール — 思考OS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,500&family=Shippori+Mincho:wght@500;600;700&family=Zen+Kaku+Gothic+New:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bottle:#1F3A2E; --bottle-deep:#152A20; --brass:#C9A24B; --brass-bright:#E0C374;
+    --ivory:#EDE6D6; --ivory-dim:#DCD3BC; --wine:#8B3A3A; --paper:#EFE7D4;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:radial-gradient(ellipse at top,#24402F 0%, var(--bottle) 45%, var(--bottle-deep) 100%); color:var(--ivory); font-family:'Zen Kaku Gothic New',sans-serif; min-height:100vh;}
+  .app{max-width:720px; margin:0 auto; padding:50px 24px 100px;}
+  h1{font-family:'Shippori Mincho',serif; text-align:center; font-size:26px; margin-bottom:4px;}
+  .sub{text-align:center; color:var(--ivory-dim); font-family:'Cormorant Garamond',serif; font-size:16px; margin-bottom:36px;}
+  label{display:block; font-family:'Cormorant Garamond',serif; font-style:italic; font-size:14px; color:var(--brass-bright); margin:18px 0 6px;}
+  select, input[type=number]{
+    font-family:'Zen Kaku Gothic New',sans-serif; font-size:15px; padding:9px 12px;
+    border:1px solid var(--brass); border-radius:3px; background:var(--paper); color:#2A2418;
+  }
+  select{width:100%;}
+  input[type=number]{width:120px;}
+  textarea{
+    width:100%; min-height:320px; margin-top:6px; padding:14px 16px;
+    font-family:'Zen Kaku Gothic New',sans-serif; font-size:14px; line-height:1.8;
+    border:1px solid var(--brass); border-radius:3px; background:var(--paper); color:#2A2418; resize:vertical;
+  }
+  .row{display:flex; gap:20px; flex-wrap:wrap;}
+  .row > div{flex:1; min-width:160px;}
+  .hint{font-size:12px; color:var(--ivory-dim); margin-top:6px; line-height:1.6;}
+  button{
+    margin-top:26px; width:100%; padding:14px; font-family:'Cormorant Garamond',serif; font-size:17px;
+    letter-spacing:.06em; background:var(--brass); color:var(--bottle-deep); border:none; border-radius:3px;
+    cursor:pointer; font-weight:600;
+  }
+  button:hover{background:var(--brass-bright);}
+  .filename-preview{
+    margin-top:14px; text-align:center; font-family:'Cormorant Garamond',serif; font-style:italic;
+    font-size:14px; color:var(--brass-bright);
+  }
+  .status{margin-top:16px; text-align:center; font-size:13px; color:var(--ivory-dim); min-height:20px;}
+  .detect-note{
+    margin-top:8px; padding:8px 12px; background:rgba(201,162,75,.12); border:1px solid rgba(201,162,75,.35);
+    border-radius:3px; font-size:12.5px; color:var(--brass-bright); display:none;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>講義ノート ファイル化ツール</h1>
+  <div class="sub">貼り付けて、選んで、ダウンロード。それを notes フォルダに入れるだけ。</div>
+
+  <label>科目</label>
+  <select id="subject">
+    <option value="__manual__">— まだ一覧に無い科目（手動入力） —</option>
+  </select>
+  <input type="text" id="manualKey" placeholder="科目キーを入力（例: newcourse）" style="display:none; margin-top:8px; width:100%;">
+  <div class="hint" id="manualHint" style="display:none;">
+    まだサイトに科目ページが無い場合の一時的な入力欄です。科目キーは半角英数字で（例: philosophy, strategy）。
+  </div>
+
+  <div class="row">
+    <div>
+      <label>週番号（Week）</label>
+      <input type="number" id="weekNum" min="1" max="50" placeholder="例: 3">
+    </div>
+  </div>
+  <div class="detect-note" id="detectNote"></div>
+
+  <label>講義ノート本文（そのまま貼り付けてOK）</label>
+  <textarea id="noteText" placeholder="ここに講義ノートの本文をペースト…"></textarea>
+  <div class="hint">
+    ・強調したい部分は <code>==この様に==</code> で囲むとサイト上で金色ハイライトになります（任意）<br>
+    ・太字は <code>**この様に**</code>（任意、なくても問題ありません）
+  </div>
+
+  <div class="filename-preview" id="filenamePreview">保存先: notes/philosophy/01.txt</div>
+  <button id="loadBtn" style="background:transparent; border:1px solid var(--brass); color:var(--brass-bright); margin-top:10px;">既存のノートを読み込んで編集する</button>
+
+  <button id="downloadBtn">ファイルをダウンロード</button>
+  <div class="status" id="status"></div>
+</div>
+
+<script>
+const subjectSel = document.getElementById('subject');
+const weekInput = document.getElementById('weekNum');
+const textArea = document.getElementById('noteText');
+const preview = document.getElementById('filenamePreview');
+const statusEl = document.getElementById('status');
+const detectNote = document.getElementById('detectNote');
+
+function updatePreview(){
+  const subj = (typeof currentSubjectKey === 'function') ? currentSubjectKey() : subjectSel.value;
+  const w = Number(weekInput.value) || 1;
+  preview.textContent = `保存先: notes/${subj}/${String(w).padStart(2,'0')}.txt`;
+}
+subjectSel.addEventListener('change', updatePreview);
+weekInput.addEventListener('input', updatePreview);
+updatePreview();
+
+// 貼り付けたテキストから週番号らしき数字を自動検出（あくまで提案、確定はしない）
+textArea.addEventListener('input', ()=>{
+  const text = textArea.value;
+  const patterns = [
+    /Week\s*(\d{1,3})/i,
+    /第\s*(\d{1,3})\s*[回週講]/,
+    /^\s*(\d{1,3})[.\uFF0E：:、]/,
+    /^\s*0*(\d{1,3})\s*[：:]/
+  ];
+  let found = null;
+  for(const p of patterns){
+    const m = text.match(p);
+    if(m){ found = m[1]; break; }
+  }
+  if(found && !weekInput.value){
+    detectNote.style.display = 'block';
+    detectNote.textContent = `本文から「Week ${found}」らしき番号を検出しました。上の週番号欄に自動入力します（違ったら書き換えてください）`;
+    weekInput.value = found;
+    updatePreview();
+  }
+});
+
+document.getElementById('downloadBtn').addEventListener('click', ()=>{
+  const subj = (typeof currentSubjectKey === 'function') ? currentSubjectKey() : subjectSel.value;
+  const w = Number(weekInput.value);
+  const text = textArea.value.trim();
+  if(!w){ statusEl.textContent = '週番号を入力してください'; return; }
+  if(!text){ statusEl.textContent = '本文を貼り付けてください'; return; }
+
+  const filename = `${String(w).padStart(2,'0')}.txt`;
+  const blob = new Blob([text], {type:'text/plain;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  statusEl.textContent = `ダウンロードしました → notes/${subj}/${filename} に配置してください`;
+});
+</script>
+
+<script src="js/data/philosophy.js"></script>
+<script src="js/data/semantics.js"></script>
+<script src="js/data/cogsci.js"></script>
+<script src="js/data/behavior.js"></script>
+<script src="js/data/game.js"></script>
+<script src="js/data/strategy.js"></script>
+<script>
+/* 科目一覧はここに登録された科目データから自動生成される。
+   新しい科目データファイル(js/data/○○.js)を作ったら、
+   このscriptタグ一覧に1行追加し、下のsubjectsListにも1行足すだけでOK。 */
+const subjectsList = [philosophy, semantics, cogsci, behavior, game, strategy];
+
+const subjectSelectEl = document.getElementById('subject');
+subjectsList.forEach(s=>{
+  const opt = document.createElement('option');
+  opt.value = s.key;
+  opt.textContent = s.name;
+  subjectSelectEl.insertBefore(opt, subjectSelectEl.firstChild);
+});
+subjectSelectEl.value = subjectsList[0].key;
+
+const manualKeyInput = document.getElementById('manualKey');
+const manualHint = document.getElementById('manualHint');
+subjectSelectEl.addEventListener('change', ()=>{
+  const isManual = subjectSelectEl.value === '__manual__';
+  manualKeyInput.style.display = isManual ? 'block' : 'none';
+  manualHint.style.display = isManual ? 'block' : 'none';
+  updatePreview();
+});
+
+function currentSubjectKey(){
+  return subjectSelectEl.value === '__manual__' ? (manualKeyInput.value.trim() || '未設定') : subjectSelectEl.value;
+}
+
+document.getElementById('loadBtn').addEventListener('click', async ()=>{
+  const subj = currentSubjectKey();
+  const w = Number(weekInput.value);
+  if(!w){ statusEl.textContent = '週番号を入力してください'; return; }
+  const path = `notes/${subj}/${String(w).padStart(2,'0')}.txt`;
+  statusEl.textContent = '読み込み中…';
+  try{
+    const res = await fetch(path + '?t=' + Date.now()); // キャッシュ回避
+    if(!res.ok) throw new Error('not found');
+    const text = await res.text();
+    textArea.value = text;
+    statusEl.textContent = `既存のノート（notes/${subj}/${String(w).padStart(2,'0')}.txt）を読み込みました。編集してダウンロードし直せば上書き用ファイルになります`;
+  }catch(e){
+    statusEl.textContent = `notes/${subj}/${String(w).padStart(2,'0')}.txt はまだ存在しません（新規作成としてこのまま入力できます）`;
+  }
+});
+</script>
+
+</body>
+</html>
