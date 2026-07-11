@@ -85,3 +85,4 @@
     renderWidget(currentUser);
   })();
 })();
+ 
